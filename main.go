@@ -48,70 +48,41 @@ func main() {
 			log.Fatal(err)
 		}
 	}()
-	oldInfo := Info{}
 	for {
 		if Stop {
 			restoreConfig()
 			fmt.Println("Max Charging Current setting restored.")
 			os.Exit(0)
 		}
-		info := Info{}
-		idleDisShown := false
 		if Enabled {
-			idleDisShown = false
-			byte_str, err := os.ReadFile(batt_stat_file)
-			if err != nil {
-				log.Fatal(err)
-			}
-			status := strings.TrimSpace(string(byte_str))
-			info.Status = status
-			raw_cap, err := readIntFromFile(capacity_raw_file)
-			if err != nil {
-				log.Fatal(err)
-			}
-			info.BattLevel = raw_cap
-			info.AmpLimit = 1000
-			switch {
-			case raw_cap > Threshold:
-				info.AmpLimit = 1000
-			case raw_cap < Threshold-25:
-				info.AmpLimit = 3000000
-			case raw_cap < Threshold:
-				info.AmpLimit = 50000
-			}
 			inCurrent, err := readIntFromFile(current_input_file)
 			if err != nil {
 				log.Fatal(err)
 			}
-			if inCurrent == 0 {
-				setChargeCurrent(3000000)
+			var charging bool
+			if inCurrent > 0 {
+				charging = true
 			} else {
-				setChargeCurrent(info.AmpLimit)
+				charging = false
 			}
-		} else {
-			if !idleDisShown {
-				idleDisShown = true
-				fmt.Printf("%-20s: %-15s\n", "Service", "Disabled")
-				fmt.Printf("%-20s: %-15s\n", "Battery Status", "Unavailable")
-				fmt.Printf("%-20s: %-15s\n", "Set Battery Level", "Unavailable")
-				fmt.Printf("%-20s: %-15s\n", "Battery Level", "Unavailable")
-				fmt.Printf("%-20s: %-15s\n\033[5F", "Max Charging Current", "Unavailable")
-
-			}
-		}
-		if info != oldInfo {
-			oldInfo = info
-			fmt.Printf("%-20s: %-15s\n", "Service", func() string {
-				if Enabled {
-					return "Enabled"
-				} else {
-					return "Disabled"
+			if charging {
+				raw_cap, err := readIntFromFile(capacity_raw_file)
+				if err != nil {
+					log.Fatal(err)
 				}
-			}())
-			fmt.Printf("%-20s: %-15s\n", "Battery Status", info.Status)
-			fmt.Printf("%-20s: %-15.2f\n", "Set Battery Level", float64(Threshold)/100)
-			fmt.Printf("%-20s: %-15.2f\n", "Battery Level", float64(info.BattLevel)/100)
-			fmt.Printf("%-20s: %-15s\n\033[5F", "Max Charging Current", fmt.Sprintf("%dmAh", info.AmpLimit/1000))
+				AmpLimit := 1000
+				switch {
+				case raw_cap > Threshold:
+					AmpLimit = 1000
+				case raw_cap < Threshold-25:
+					AmpLimit = 3000000
+				case raw_cap < Threshold:
+					AmpLimit = 50000
+				}
+				setChargeCurrent(AmpLimit)
+			} else {
+				setChargeCurrent(3000000)
+			}
 		}
 		time.Sleep(time.Second)
 	}
